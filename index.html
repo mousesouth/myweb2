@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encrypt/Decrypt cloneSettings.json</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <style>
+        @keyframes gradient {
+            0% {background-position: 0% 50%;}
+            50% {background-position: 100% 50%;}
+            100% {background-position: 0% 50%;}
+        }
+        .animate-gradient {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-4xl">
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <div class="p-6 sm:p-8">
+                <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">Secure File Processing</div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Encrypt/Decrypt cloneSettings.json</h1>
+                <p class="text-gray-600 mb-6">Securely process your configuration files.</p>
+                <form id="cryptForm" class="space-y-6">
+                    <div>
+                        <label for="packageName" class="block text-sm font-medium text-gray-700">Package Name</label>
+                        <input type="text" id="packageName" class="mt-1 block w-full rounded-md border-2 border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-3 py-2" required>
+                    </div>
+                    <div>
+                        <label for="fileInput" class="block text-sm font-medium text-gray-700">Select File</label>
+                        <input type="file" id="fileInput" class="mt-1 block w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-indigo-50 file:text-indigo-700
+                            hover:file:bg-indigo-100" required>
+                    </div>
+                    <div>
+                        <button type="button" id="processBtn" class="w-full animate-gradient text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out transform hover:scale-105">
+                            Encrypt/Decrypt
+                        </button>
+                    </div>
+                </form>
+                <div class="mt-6">
+                    <label for="outputContent" class="block text-sm font-medium text-gray-700">Output</label>
+                    <textarea id="outputContent" rows="10" class="mt-1 block w-full rounded-md border-2 border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-3 py-2" readonly></textarea>
+                </div>
+                <div class="mt-4">
+                    <button id="downloadBtn" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out hover:bg-indigo-700">
+                        Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isEncrypted = false;
+
+        document.getElementById('processBtn').addEventListener('click', function() {
+            processFile();
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            downloadFile();
+        });
+
+        function processFile() {
+            const packageName = document.getElementById('packageName').value;
+            const fileInput = document.getElementById('fileInput').files[0];
+
+            if (!packageName || !fileInput) {
+                alert('Please enter a package name and select a file.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileContent = e.target.result;
+                const key = generateKeyFromPackageName(packageName);
+                isEncrypted = checkIfEncrypted(fileContent);
+                let processedContent;
+
+                if (isEncrypted) {
+                    processedContent = decryptAES(fileContent, key);
+                    if (processedContent.startsWith('Decryption failed')) {
+                        document.getElementById('outputContent').value = processedContent;
+                        return;
+                    }
+                    isEncrypted = false;
+                } else {
+                    processedContent = encryptAES(fileContent, key);
+                    isEncrypted = true;
+                }
+
+                document.getElementById('outputContent').value = processedContent;
+            };
+            reader.readAsText(fileInput);
+        }
+
+        function generateKeyFromPackageName(packageName) {
+            const FIXED_STRING = "/I am the one who knocks!";
+            const combinedString = packageName + FIXED_STRING;
+            const hash = CryptoJS.MD5(combinedString);
+            const keyBytes = hash.toString(CryptoJS.enc.Hex).substring(0, 32);
+            return CryptoJS.enc.Hex.parse(keyBytes);
+        }
+
+        function checkIfEncrypted(content) {
+            try {
+                const decoded = atob(content);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function encryptAES(plainText, key) {
+            try {
+                const encryptedBytes = CryptoJS.AES.encrypt(plainText, key, {
+                    mode: CryptoJS.mode.ECB,
+                    padding: CryptoJS.pad.Pkcs7
+                });
+                const encryptedContent = encryptedBytes.toString();
+                return encryptedContent;
+            } catch (error) {
+                console.error('Encryption error:', error);
+                return 'Encryption failed. Please check the package name and file content.';
+            }
+        }
+
+        function decryptAES(encryptedText, key) {
+            try {
+                const decryptedBytes = CryptoJS.AES.decrypt(encryptedText, key, {
+                    mode: CryptoJS.mode.ECB,
+                    padding: CryptoJS.pad.Pkcs7
+                });
+                const decryptedContent = decryptedBytes.toString(CryptoJS.enc.Utf8);
+                return decryptedContent;
+            } catch (error) {
+                console.error('Decryption error:', error);
+                return 'Decryption failed. Please check the package name and file content.';
+            }
+        }
+
+        function downloadFile() {
+            const content = document.getElementById('outputContent').value;
+            if (!content) {
+                alert('No content to download. Please process a file first.');
+                return;
+            }
+
+            let downloadContent;
+            if (isEncrypted) {
+                // If encrypted, download as is
+                downloadContent = content;
+            } else {
+                // If decrypted, parse and stringify without indentation
+                try {
+                    const jsonContent = JSON.parse(content);
+                    downloadContent = JSON.stringify(jsonContent);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    downloadContent = content; // Fallback to original content if parsing fails
+                }
+            }
+
+            const blob = new Blob([downloadContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'cloneSettings.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
